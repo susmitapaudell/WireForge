@@ -15,7 +15,7 @@ int main(){
         return 1;
     }
     else{
-        std::cout<<"socket created successfully";
+        std::cout<<"socket created successfully\n";
     }
 
     //create and configure server address
@@ -26,18 +26,47 @@ int main(){
     server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     //connect to the server
-    int server_sock = connect(client_sock, 
+    int connection_result = connect(client_sock, 
         (struct sockaddr*)&server_addr,
         sizeof(server_addr));
 
-    if (server_sock<0){
+    if (connection_result<0){
         std::cout<<"connection failed";
         return 1;
     }
     else{
-        std::cout<<"connected to the suerver";
+        std::cout<<"connected to the server\n";
     }
 
+
     //send data
+
+        char buffer[256];
+        std::cout<<"\nenter message\n";
+        std::cin.getline(buffer, 256);
+        
+        int message_length = strlen(buffer);
+
+        int byte_send = send(client_sock, buffer, message_length, 0);
+
+        if(byte_send<0){
+            std::cout<<"\nmessage failed to send";
+            return 1;
+        }
+        else{
+            std::cout<<"\nmessage sent to the server";
+        }
+
+        int receive_message_from_server = recv(client_sock, buffer, message_length, 0);
+        if(receive_message_from_server<0){
+            std::cout<<"\nmessage could not be received back from the server";
+        }
+        else{
+            std::cout<<"\nmessage successfully received back from the server";
+            std::cout<<"\nserver send back: \t"<<buffer;
+        }
+    
+    close(client_sock);
+
     return 0;
 }
