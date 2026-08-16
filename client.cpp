@@ -40,16 +40,20 @@ int main(){
 
 
     //send data
+    char buffer[256];
 
-        char buffer[256];
+    while(1){
+        
         std::cout<<"\nenter message\n";
         std::cin.getline(buffer, 256);
         
         int message_length = strlen(buffer);
 
-        int byte_send = send(client_sock, buffer, message_length, 0);
+        int sent_bytes = send(client_sock, buffer, message_length, 0);
 
-        if(byte_send<0){
+        // std::cout<<"sent bytes value = " << sent_bytes;
+        
+        if(sent_bytes<0){
             std::cout<<"\nmessage failed to send";
             return 1;
         }
@@ -57,7 +61,7 @@ int main(){
             std::cout<<"\nmessage sent to the server";
         }
 
-        int receive_message_from_server = recv(client_sock, buffer, message_length, 0);
+        int receive_message_from_server = recv(client_sock, buffer, sizeof(buffer)-1, 0);
         if(receive_message_from_server<0){
             std::cout<<"\nmessage could not be received back from the server";
         }
@@ -65,6 +69,7 @@ int main(){
             std::cout<<"\nmessage successfully received back from the server";
             std::cout<<"\nserver send back: \t"<<buffer;
         }
+    }
     
     close(client_sock);
 

@@ -64,23 +64,25 @@ int main() {
 
     std::cout<<"client accepted for the connection\n";
 
-   
-        char buffer[256];
+    char buffer[256]; 
+    
+    while(1){
+        int received_bytes = recv(client_sock, buffer, sizeof(buffer)-1, 0);
 
-        int message_length = sizeof(buffer);
-
-        int received_bytes = recv(client_sock, buffer, message_length, 0);
+        // std::cout <<"received bytes value = " << received_bytes;
 
         if(received_bytes<0){
             std::cout<<"\nmessage couldn't be received\n";
         }
         else{
             std::cout<<"\nmessage received successfully\n";
+
             buffer[received_bytes]='\0';
+
             std::cout<<"\nClient says:\t" << buffer;
         }
 
-        int send_back_to_client = send(client_sock, buffer, message_length, 0);
+        int send_back_to_client = send(client_sock, buffer, sizeof(buffer)-1, 0);
 
         if(send_back_to_client<0){
             std::cout<<"\nserver couldn't send the message back to the cilent";
@@ -88,7 +90,7 @@ int main() {
         else{
             std::cout<<"\nmessage successfully sent back to the client";
         }
-    
+    }
     close(client_sock);
     close(sockfd);
 
