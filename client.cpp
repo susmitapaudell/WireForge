@@ -3,6 +3,7 @@
 #include<netinet/in.h>
 #include<unistd.h>
 #include<arpa/inet.h>
+#include<cstring>
 
 int main(){
     
@@ -11,7 +12,7 @@ int main(){
     client_sock = socket(AF_INET, SOCK_STREAM, 0);
 
     if (client_sock<0){
-        std::cout<<"socket not created";
+        std::cout<<"socket not created\n";
         return 1;
     }
     else{
@@ -31,7 +32,7 @@ int main(){
         sizeof(server_addr));
 
     if (connection_result<0){
-        std::cout<<"connection failed";
+        std::cout<<"connection failed\n";
         return 1;
     }
     else{
@@ -44,9 +45,13 @@ int main(){
 
     while(1){
         
-        std::cout<<"\nenter message\n";
+        std::cout<<"enter message\n";
         std::cin.getline(buffer, 256);
         
+        if(strcmp(buffer,"quit")==0){
+            break;
+        }
+
         int message_length = strlen(buffer);
 
         int sent_bytes = send(client_sock, buffer, message_length, 0);
@@ -54,23 +59,22 @@ int main(){
         // std::cout<<"sent bytes value = " << sent_bytes;
         
         if(sent_bytes<0){
-            std::cout<<"\nmessage failed to send";
+            std::cout<<"message failed to send\n";
             return 1;
         }
         else{
-            std::cout<<"\nmessage sent to the server";
+            std::cout<<"message sent to the server\n";
         }
 
         int receive_message_from_server = recv(client_sock, buffer, sizeof(buffer)-1, 0);
         if(receive_message_from_server<0){
-            std::cout<<"\nmessage could not be received back from the server";
+            std::cout<<"message could not be received back from the server\n";
         }
         else{
-            std::cout<<"\nmessage successfully received back from the server";
-            std::cout<<"\nserver send back: \t"<<buffer;
+            std::cout<<"message successfully received back from the server\n";
+            std::cout<<"server send back: \t"<<buffer<<'\n';
         }
     }
-    
     close(client_sock);
 
     return 0;
