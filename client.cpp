@@ -40,41 +40,128 @@ int main(){
     }
 
 
-    //send data
+    //username registration
     char buffer[256];
 
+    int received_bytes = recv(
+        client_sock,
+        buffer,
+        sizeof(buffer)-1,
+        0
+    );
+
+    if(received_bytes<0){
+        std::cout<<"username prompt could not be received\n";
+        close(client_sock);
+        return 1;
+    }
+
+    buffer[received_bytes] = '\0';
+
+    std::cout<<buffer;
+
+    std::cin.getline(buffer, 256);
+
+    int username_length = strlen(buffer);
+
+    int sent_bytes = send(
+        client_sock,
+        buffer,
+        username_length,
+        0
+    );
+
+    if(sent_bytes<0){
+        std::cout<<"username failed to send\n";
+        close(client_sock);
+        return 1;
+    }
+
+
+    //receive welcome message
+    received_bytes = recv(
+        client_sock,
+        buffer,
+        sizeof(buffer)-1,
+        0
+    );
+
+    if(received_bytes<0){
+        std::cout<<"welcome message could not be received\n";
+        close(client_sock);
+        return 1;
+    }
+
+    buffer[received_bytes] = '\0';
+
+    std::cout<<buffer;
+
+
+    //send data
     while(1){
         
         std::cout<<"enter message\n";
         std::cin.getline(buffer, 256);
         
-        if(strcmp(buffer,"quit")==0){
-            break;
-        }
-
         int message_length = strlen(buffer);
 
-        int sent_bytes = send(client_sock, buffer, message_length, 0);
+        int sent_bytes = send(
+            client_sock,
+            buffer,
+            message_length,
+            0
+        );
 
         // std::cout<<"sent bytes value = " << sent_bytes;
         
         if(sent_bytes<0){
             std::cout<<"message failed to send\n";
-            return 1;
+            break;
         }
         else{
             std::cout<<"message sent to the server\n";
         }
 
-        int receive_message_from_server = recv(client_sock, buffer, sizeof(buffer)-1, 0);
-        if(receive_message_from_server<0){
-            std::cout<<"message could not be received back from the server\n";
+
+        //quit command
+        if(strcmp(buffer,"/quit")==0){
+            break;
         }
+
+
+        int receive_message_from_server = recv(
+            client_sock,
+            buffer,
+            sizeof(buffer)-1,
+            0
+        );
+
+        if(receive_message_from_server<0){
+
+            std::cout
+                <<"message could not be received back from the server\n";
+        }
+
+        else if(receive_message_from_server==0){
+
+            std::cout<<"server disconnected\n";
+            break;
+        }
+
         else{
-            std::cout<<"message successfully received back from the server\n";
-            std::cout<<"server send back: \t"<<buffer<<'\n';
+
+            buffer[receive_message_from_server] = '\0';
+
+            std::cout
+                <<"message successfully received back from the server\n";
+
+            std::cout
+                <<"server send back: \t"
+                <<buffer
+                <<'\n';
         }
     }
+
     close(client_sock);
 
     return 0;

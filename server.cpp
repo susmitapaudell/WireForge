@@ -4,47 +4,196 @@
 #include<unistd.h>
 #include<cstring>
 #include<thread>
+#include<string>
+#include<vector>
+#include<mutex>
+
+std::vector<std::pair<int, std::string>> clients;
+std::mutex clients_mutex;
 
 
-void handle_client(int client_sock, int client_id){
+void handle_client(int client_sock){
 
-    char buffer[256]; 
+    char buffer[256];
 
+    std::string username;
+
+
+    //username registration
     while(1){
+
+        const char* prompt = "Enter username: ";
+        send(client_sock, prompt, strlen(prompt), 0);
+
         int received_bytes = recv(client_sock, buffer, sizeof(buffer)-1, 0);
 
         if(received_bytes<0){
-            std::cout<<"Client "<<client_id<<": message couldn't be received\n";
+            std::cout<<"message couldn't be received\n";
             break;
         }
 
-        else if (received_bytes == 0) { 
-            std::cout<<"Client "<<client_id<<" disconnected gracefully\n";
-            break; 
+        else if(received_bytes == 0){
+            std::cout<<"Client disconnected gracefully\n";
+            break;
         }
 
         else{
+
             buffer[received_bytes]='\0';
 
-            if(strncmp(buffer,"quit",4)!=0){
-                std::cout<<"Client "<<client_id<<" says:\t" << buffer <<'\n';
-                
-                int send_back_to_client = send(client_sock, buffer, received_bytes, 0);
+            username = buffer;
 
-                if(send_back_to_client<0){
-                    std::cout<<"server couldn't send the message back to Client "<<client_id<<"\n";
-                    break;
+            if(!username.empty() && username.back() == '\n')
+                username.pop_back();
+
+            if(!username.empty() && username.back() == '\r')
+                username.pop_back();
+
+
+            bool taken = false;
+
+            {
+                std::lock_guard<std::mutex> lock(clients_mutex);
+
+                for(const auto& client : clients){
+
+                    if(client.second == username){
+                        taken = true;
+                        break;
+                    }
                 }
-                else{
-                    std::cout<<"message successfully sent back to Client "<<client_id<<"\n";
+
+                if(!taken){
+                    clients.push_back({client_sock, username});
                 }
             }
-            else{
-                std::cout<<"Client "<<client_id<<" requested to quit\n";
-                break;
-            }        
-        }   
+
+
+            if(taken){
+
+                const char* message = "Username already taken\n";
+
+                send(client_sock, message, strlen(message), 0);
+
+                continue;
+            }
+
+            std::cout<<"a user "<<username << " registered\n";
+
+            const char* message = "Username registered successfully\n";
+
+            send(client_sock, message, strlen(message), 0);
+            
+            break;
+        }
     }
+
+
+    //receive messages
+    while(1){
+
+        int received_bytes = recv(client_sock, buffer, sizeof(buffer)-1, 0);
+
+        if(received_bytes<0){
+
+            std::cout<<username
+                     <<": message couldn't be received\n";
+
+            break;
+        }
+
+        else if(received_bytes == 0){
+
+            std::cout<<username
+                     <<" disconnected gracefully\n";
+
+            break;
+        }
+
+        else{
+
+            buffer[received_bytes]='\0';
+
+
+            //quit command
+            if(strcmp(buffer,"/quit")==0){
+
+                std::cout<<username
+                         <<" requested to quit\n";
+
+                break;
+            }
+
+
+            //users command
+            else if(strcmp(buffer,"/users")==0){
+
+                std::string user_list = "Online users:\n";
+
+                std::lock_guard<std::mutex> lock(clients_mutex);
+
+                for(const auto& client : clients){
+
+                    user_list += client.second;
+                    user_list += "\n";
+                }
+
+                send(
+                    client_sock,
+                    user_list.c_str(),
+                    user_list.length(),
+                    0
+                );
+            }
+
+
+            //normal message
+            else{
+
+                std::cout<<username
+                         <<" says:\t"
+                         <<buffer
+                         <<'\n';
+
+                int send_back_to_client =
+                    send(client_sock, buffer, received_bytes, 0);
+
+                if(send_back_to_client<0){
+
+                    std::cout
+                        <<"server couldn't send the message back to "
+                        <<username
+                        <<"\n";
+
+                    break;
+                }
+
+                else{
+
+                    std::cout
+                        <<"message successfully sent back to "
+                        <<username
+                        <<"\n";
+                }
+            }
+        }
+    }
+
+
+    //remove client from clients
+    {
+        std::lock_guard<std::mutex> lock(clients_mutex);
+
+        for(auto it = clients.begin(); it != clients.end(); ++it){
+
+            if(it->first == client_sock){
+
+                clients.erase(it);
+                break;
+            }
+        }
+    }
+
 
     close(client_sock);
 }
@@ -54,10 +203,12 @@ int main() {
 
     //socket creation
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd<0){
+
+    if(sockfd<0){
         std::cout<<"socket not created properly\n";
         return 1;
     }
+
     else {
         std::cout<<"socket created successfully\n";
     }
@@ -72,20 +223,24 @@ int main() {
 
 
     //bind socket to IP and port
-    int bind_sock = bind(sockfd, 
-                    (struct sockaddr*)&server_addr,
-                    sizeof(server_addr));
+    int bind_sock = bind(
+        sockfd,
+        (struct sockaddr*)&server_addr,
+        sizeof(server_addr)
+    );
 
-    if (bind_sock<0) {
+    if(bind_sock<0) {
         std::cout<<"bind failed\n";
         close(sockfd);
         return 1;
     }
+
     std::cout<<"socket bound to port 8080\n";
-  
+
 
     //start listening
-    if(listen(sockfd, 5) < 0){
+    if(listen(sockfd, 5)<0){
+
         std::cout<<"listening failed\n";
         close(sockfd);
         return 1;
@@ -97,30 +252,32 @@ int main() {
 
 
     //accept clients
-    int next_client_id = 1;
-
     while(1){
 
         sockaddr_in client_addr{};
         socklen_t client_len = sizeof(client_addr);
 
-        int client_sock = accept(sockfd, 
-            (struct sockaddr*)&client_addr, 
-            &client_len);
+        int client_sock = accept(
+            sockfd,
+            (struct sockaddr*)&client_addr,
+            &client_len
+        );
 
-        if (client_sock < 0){
+        if(client_sock<0){
+
             std::cout<<"accept failed\n";
             continue;
         }
 
-        int client_id = next_client_id++;
 
-        std::cout<<"Client "<<client_id<<" accepted for the connection\n";
+        std::cout<<"new client accepted for the connection\n";
 
-        std::thread client_thread(handle_client, client_sock, client_id);
+
+        std::thread client_thread(handle_client, client_sock);
 
         client_thread.detach();
     }
+
 
     close(sockfd);
 
